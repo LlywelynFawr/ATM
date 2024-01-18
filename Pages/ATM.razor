@@ -1,0 +1,105 @@
+﻿@page "/ATM/{CardNumber}/{Pin}"
+@using ATMBlazorApp.Data;
+@using ATMBlazorApp.DAL;
+@using ATMBlazorApp.Services;
+@using System.Text.RegularExpressions;
+@inject IAccountServices _accountServices
+@inject NavigationManager NavManager
+
+<PageTitle>ATM</PageTitle>
+
+<h1 class="title">Welcome to Llywelyn ATM Services</h1>
+<h2 class="subtitle">Please select from one of the following options</h2>
+
+<div class="atm">
+<p role="status">@information</p>
+<button @onclick="() => CheckBalance()">Check Balance</button>
+<input class="user-input" type="number" placeholder="Enter an amount to withdraw" @bind="withdraw"/>
+<button @onclick="() => Withdraw(withdraw)">Withdraw</button>
+<input class="user-input" type="number" placeholder="Enter and amount to deposit" @bind="deposit"/>
+<button @onclick="() => Deposit(deposit)">Deposit</button>
+<a class="logout" href="/">Logout</a>
+</div>
+
+@code {
+    private Account account;
+    private string? information;
+
+
+    [Parameter]
+    public string CardNumber { get; set; }
+    [Parameter]
+    public string Pin { get; set; }
+
+    public decimal deposit;
+    public decimal withdraw;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        account = new Account()
+        {
+        };
+
+        account = await GetLatestAccountDetails();
+
+    }
+
+    private async Task<Account> GetLatestAccountDetails()
+    {
+        return await _accountServices.GetAccount(CardNumber, Pin);
+    }
+
+    private async Task CheckBalance()
+    {
+        account = await GetLatestAccountDetails();
+        information = $"You have {account.Amount} in your account";
+    }
+
+    private async Task Deposit(decimal depositAmount)
+    {
+        if (depositAmount > 0)
+        {
+            account.Amount += Math.Round(depositAmount,2);
+            information = $"Deposit succeeded, you now have {account.Amount} in your account";
+            await _accountServices.UpdateAccount(CardNumber, Pin, account.Amount);
+            deposit = 0;
+        }
+        else
+        {
+            information = "Please enter a positive value to deposit";
+        }
+
+    }
+
+    private async Task Withdraw(decimal withdrawAmount)
+    {
+        if (withdrawAmount > 0)
+        {
+
+            if (withdrawAmount < account.Amount)
+            {
+                account.Amount -= Math.Round(withdrawAmount,2);
+                information = $"Withdrawal succeeded, you now have {account.Amount} in your account";
+                await _accountServices.UpdateAccount(CardNumber, Pin, account.Amount);
+                withdraw = 0;
+            }
+            else
+            {
+                string overdrawn = "You do not have sufficient funds to withdraw that amount";
+                information = overdrawn;
+                withdraw = 0;
+            }
+        }
+        else
+        {
+            information = "Please enter a positive value to withdraw";
+        }
+    }
+
+    private void Logout()
+    {
+        NavManager.NavigateTo("/");
+    }
+}

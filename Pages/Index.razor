@@ -1,0 +1,101 @@
+﻿@page "/"
+@using ATMBlazorApp.Data;
+@using ATMBlazorApp.DAL;
+@using ATMBlazorApp.Services;
+@using System.Text.RegularExpressions;
+@inject NavigationManager NavManager
+@inject IAccountServices _accountServices
+
+<PageTitle>Login</PageTitle>
+<h1 class="title">Welcome to Llywelyn ATM Services</h1>
+<h2 class="subtitle">To continue please enter your 16 digit card number and 4 digit pin</h2>
+<div>
+<p class="warning">@incorrectCredentials</p>
+<form class="login">
+    <input type="password" minlength="4" maxlength="4" @bind-value="@Pin" placeholder="PIN" />
+    <input type="password" minlength="16" maxlength="16" @bind-value="@CardNumber" placeholder="Card Number" />
+    <button type="button" @onclick="AttemptLogin">Login</button>
+</form>
+</div>
+@code{
+    private Account? account;
+    private AccountClass? accountClass;
+    private List<Account> accounts = new List<Account>() { };
+    private string? incorrectCredentials;
+    bool validCredentials;
+    [Parameter]
+    public string? Pin { get; set; }
+    [Parameter]
+    public string? CardNumber { get; set; }
+
+    private decimal Amount;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        account = new Account()
+        {
+        };
+
+        accountClass = new AccountClass() { };
+
+        Amount = accountClass.InitialAmount();
+
+        accounts = await _accountServices.GetAllAccounts();
+
+    }
+
+    async Task AttemptLogin()
+    {
+        await CheckCredentials(CardNumber, Pin);
+        if(validCredentials)
+        {
+            
+            NavManager.NavigateTo($"/ATM/{CardNumber}/{Pin}");
+        }
+        else
+        {
+            incorrectCredentials = "Please enter a valid pin and card number";
+            Pin = "";
+            CardNumber = "";
+        }
+    }
+
+    async Task CheckCredentials(string _cardNumber, string _pin) 
+    {
+        try
+        {
+            if (Regex.IsMatch(_pin, @"^[0-9]+$") && Regex.IsMatch(_cardNumber, @"^[0-9]+$"))
+            {
+                var loggedAccount = await GetLoggedAccount(_cardNumber, _pin);
+                if (loggedAccount != null)
+                {
+                    account = await _accountServices.GetAccount(_cardNumber, _pin);
+                    validCredentials = true;
+                }
+                else
+                {
+                    account = await _accountServices.CreateAccount(_cardNumber, _pin, Amount);
+                    validCredentials = true;
+                }
+            }
+            else
+            {
+                validCredentials = false;
+            }
+        }
+        catch(ArgumentNullException)
+        {
+            incorrectCredentials = "Please enter a valid pin and card number";
+        }
+    }
+
+    private async Task<Account> GetLoggedAccount(string _cardNumber, string _pin)
+    {
+        Account loggedAccount = await _accountServices.GetAccount(_cardNumber, _pin);
+        return loggedAccount;
+    }
+
+}
